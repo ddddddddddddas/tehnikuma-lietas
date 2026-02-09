@@ -8,9 +8,6 @@
 const char* ssid = "------";
 const char* password = "------";
 
-const char* SERVER_URL = "-----";
-const char* API_KEY    = "-----";
-const char* DEVICE_ID  = "-----";
 
 #define ONE_WIRE_BUS D2
 
@@ -82,3 +79,4 @@ void loop() {
 
   delay(2000);
 }
+
