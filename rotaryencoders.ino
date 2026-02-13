@@ -42,3 +42,4 @@ void loop() {
   }
   lastA2 = a2;
 }
+
