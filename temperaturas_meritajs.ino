@@ -4,7 +4,6 @@
 #define PIN_D3 3
 #define PIN_D4 4
 #define PIN_D5 5
-#define PIN_D6 6
 
 #define WINDOW_SECONDS 30
 
@@ -100,3 +99,4 @@ void loop() {
     printLatest();
   }
 }
+
