@@ -3,8 +3,6 @@
 
 #define PIN_D3 3
 #define PIN_D4 4
-#define PIN_D5 5
-
 #define WINDOW_SECONDS 30
 
 OneWire ow3(PIN_D3), ow4(PIN_D4), ow5(PIN_D5), ow6(PIN_D6);
@@ -99,4 +97,5 @@ void loop() {
     printLatest();
   }
 }
+
 
