@@ -5,8 +5,6 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
-const char* ssid = "------";
-const char* password = "------";
 
 const char* SERVER_URL = "-----";
 const char* API_KEY    = "-----";
@@ -82,3 +80,4 @@ void loop() {
 
   delay(2000);
 }
+
