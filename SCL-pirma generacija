@@ -1,0 +1,18 @@
+// Initialize RS485 communication
+"MB_COMM_LOAD_DB"(
+    REQ := NOT "MB_COMM_LOAD_DB".DONE,
+    PORT := 269,
+    BAUD := 9600,
+    PARITY := 0,
+    MB_DB := "MB_MASTER_DB"
+);
+
+// Send Modbus request
+"MB_MASTER_DB"(
+    REQ := NOT "MB_MASTER_DB".BUSY,
+    MB_ADDR := 1,
+    MODE := 1,
+    DATA_ADDR := 40001,
+    DATA_LEN := 1,
+    DATA_PTR := DB_VFD1.TestWord
+);
