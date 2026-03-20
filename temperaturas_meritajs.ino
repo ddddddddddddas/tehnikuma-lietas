@@ -2,7 +2,7 @@
 #include <DallasTemperature.h>
 
 OneWire ow3(PIN_D3), ow4(PIN_D4), ow5(PIN_D5), ow6(PIN_D6);
-DallasTemperature dt3(&ow3), dt4(&ow4), dt5(&ow5), dt6(&ow6);
+DallasTemperature dt3(&ow3), dt4(&ow4), dt5(&ow5), dt6(&ow6)
 
 struct Sample {
   uint32_t tms;
