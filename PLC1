@@ -1,0 +1,225 @@
+CASE "MB_Modbus".State OF
+        
+        //--------------------------------------------------
+        // 0: BUILD REQUEST (READ or WRITE)
+        //--------------------------------------------------
+    0:
+        
+        IF NOT "MB_Modbus".IsWriteCycle THEN
+            //--------------------------------------------------
+            // READ (FC03)
+            //--------------------------------------------------
+            "MB_Modbus".TxBuffer[0] := "MB_Modbus".SlaveID;
+            "MB_Modbus".TxBuffer[1] := BYTE#16#03;
+            
+            "MB_Modbus".TxBuffer[2] := BYTE#16#0B;
+            "MB_Modbus".TxBuffer[3] := BYTE#16#5E;
+            
+            "MB_Modbus".TxBuffer[4] := BYTE#16#00;
+            "MB_Modbus".TxBuffer[5] := BYTE#16#04;
+            
+            #crc_1 := "FC_ModbusCRC16"(
+                                       Buffer := "MB_Modbus".TxBuffer,
+                                       Length := UINT#6
+            );
+            
+            "MB_Modbus".TxBuffer[6] := WORD_TO_BYTE(#crc_1 AND 16#FF);
+            "MB_Modbus".TxBuffer[7] := WORD_TO_BYTE(#crc_1 / 256);
+            
+            "MB_Modbus".TxLength := 8;
+            
+        ELSE
+            //--------------------------------------------------
+            // WRITE (FC16)
+            //--------------------------------------------------
+            "MB_Modbus".TxBuffer[0] := "MB_Modbus".SlaveID;
+            "MB_Modbus".TxBuffer[1] := BYTE#16#10;
+            
+            "MB_Modbus".TxBuffer[2] := BYTE#16#0A;
+            "MB_Modbus".TxBuffer[3] := BYTE#16#F9;
+            
+            "MB_Modbus".TxBuffer[4] := BYTE#16#00;
+            "MB_Modbus".TxBuffer[5] := BYTE#16#02;
+            
+            "MB_Modbus".TxBuffer[6] := BYTE#16#04;
+            
+            //--------------------------------------------------
+            // Control Word
+            //--------------------------------------------------
+            IF "DB_outgoing".Start THEN
+                #ControlWord := WORD#16#0006;
+            ELSE
+                #ControlWord := WORD#16#0000;
+            END_IF;
+            
+            "MB_Modbus".TxBuffer[7] := WORD_TO_BYTE(#ControlWord / 256);
+            "MB_Modbus".TxBuffer[8] := WORD_TO_BYTE(#ControlWord);
+            
+            //--------------------------------------------------
+            // Clamp SetHz
+            //--------------------------------------------------
+            IF "DB_outgoing".SetHz < 0.0 THEN
+                "DB_outgoing".SetHz := 0.0;
+            END_IF;
+            
+            IF "DB_outgoing".SetHz > 50.0 THEN
+                "DB_outgoing".SetHz := 50.0;
+            END_IF;
+            
+            //--------------------------------------------------
+            // Scaling
+            //--------------------------------------------------
+            #SetHzScaled := INT_TO_WORD(
+                                        REAL_TO_INT(("DB_outgoing".SetHz / 50.0) * 16384.0)
+            );
+            
+            "MB_Modbus".TxBuffer[9] := WORD_TO_BYTE(#SetHzScaled / 256);
+            "MB_Modbus".TxBuffer[10] := WORD_TO_BYTE(#SetHzScaled);
+            
+            //--------------------------------------------------
+            // CRC
+            //--------------------------------------------------
+            #crc_1 := "FC_ModbusCRC16"(
+                                       Buffer := "MB_Modbus".TxBuffer,
+                                       Length := UINT#11
+            );
+            
+            "MB_Modbus".TxBuffer[11] := WORD_TO_BYTE(#crc_1 AND 16#FF);
+            "MB_Modbus".TxBuffer[12] := WORD_TO_BYTE(#crc_1 / 256);
+            
+            "MB_Modbus".TxLength := 13;
+            
+        END_IF;
+        
+        // Reset flags
+        "MB_Modbus".SendDone := FALSE;
+        "MB_Modbus".SendError := FALSE;
+        "MB_Modbus".RxDone := FALSE;
+        "MB_Modbus".RxError := FALSE;
+        "MB_Modbus".RxLength := 0;
+        
+        "MB_Modbus".TimeoutCnt := 0;
+        
+        "MB_Modbus".State := 1;
+        
+        
+        //--------------------------------------------------
+        // 1: TRIGGER SEND
+        //--------------------------------------------------
+    1:
+        "MB_Modbus".SendReq := TRUE;
+        
+        "Send_P2P_DB"(
+                      REQ := "MB_Modbus".SendReq,
+                      "PORT" := INT#269,
+                      BUFFER := "MB_Modbus".TxBuffer,
+                      LENGTH := INT_TO_UINT("MB_Modbus".TxLength),
+                      DONE => "MB_Modbus".SendDone,
+                      ERROR => "MB_Modbus".SendError,
+                      STATUS => "MB_Modbus".SendStatus
+        );
+        
+        "MB_Modbus".SendReq := FALSE;
+        
+        "MB_Modbus".State := 2;
+        
+        
+        //--------------------------------------------------
+        // 2: WAIT SEND DONE
+        //--------------------------------------------------
+    2:
+        "Send_P2P_DB"(
+                      REQ := FALSE,
+                      "PORT" := INT#269,
+                      BUFFER := "MB_Modbus".TxBuffer,
+                      LENGTH := INT_TO_UINT("MB_Modbus".TxLength),
+                      DONE => "MB_Modbus".SendDone,
+                      ERROR => "MB_Modbus".SendError,
+                      STATUS => "MB_Modbus".SendStatus
+        );
+        
+        IF "MB_Modbus".SendDone THEN
+            "MB_Modbus".State := 3;
+        ELSIF "MB_Modbus".SendError THEN
+            "MB_Modbus".State := 0;
+        END_IF;
+        
+        
+        //--------------------------------------------------
+        // 3: RECEIVE WINDOW
+        //--------------------------------------------------
+    3:
+        "Receive_P2P_DB"(
+                         "PORT" := INT#269,
+                         BUFFER := "MB_Modbus".RxBuffer,
+                         NDR => "MB_Modbus".RxDone,
+                         ERROR => "MB_Modbus".RxError,
+                         STATUS => "MB_Modbus".RxStatus,
+                         LENGTH => "MB_Modbus".RxLength
+        );
+        
+        "MB_Modbus".TimeoutCnt := "MB_Modbus".TimeoutCnt + 1;
+        
+        IF "MB_Modbus".RxDone THEN
+            "MB_Modbus".ComCheck := TRUE;
+            "MB_Modbus".State := 4;
+            
+        ELSIF "MB_Modbus".RxError THEN
+            "MB_Modbus".ComCheck := FALSE;
+            "MB_Modbus".State := 0;
+            
+        ELSIF "MB_Modbus".TimeoutCnt > 200 THEN
+            "MB_Modbus".ComCheck := FALSE;
+            "MB_Modbus".State := 0;
+        END_IF;
+        
+        
+        //--------------------------------------------------
+        // 4: PROCESS RESPONSE
+        //--------------------------------------------------
+    4:
+        
+        IF NOT "MB_Modbus".IsWriteCycle THEN
+            
+            //--------------------------------------------------
+            // Hz
+            //--------------------------------------------------
+            #HzRaw :=
+            BYTE_TO_WORD("MB_Modbus".RxBuffer[3]) * 256 +
+            BYTE_TO_WORD("MB_Modbus".RxBuffer[4]);
+            
+            "DB_incoming".ActualHz :=
+            (INT_TO_REAL(WORD_TO_INT(#HzRaw)) / 16384.0) * 50.0;
+            
+            //--------------------------------------------------
+            // kW
+            //--------------------------------------------------
+            #kWRaw :=
+            BYTE_TO_WORD("MB_Modbus".RxBuffer[5]) * 256 +
+            BYTE_TO_WORD("MB_Modbus".RxBuffer[6]);
+            
+            "DB_incoming".ActualkW :=
+            INT_TO_REAL(WORD_TO_INT(#kWRaw)) * 0.1;
+            
+            //--------------------------------------------------
+            // Current (32-bit)
+            //--------------------------------------------------
+            #CurrentRaw :=
+            BYTE_TO_DWORD("MB_Modbus".RxBuffer[7]) * 16777216 +
+            BYTE_TO_DWORD("MB_Modbus".RxBuffer[8]) * 65536 +
+            BYTE_TO_DWORD("MB_Modbus".RxBuffer[9]) * 256 +
+            BYTE_TO_DWORD("MB_Modbus".RxBuffer[10]);
+            
+            "DB_incoming".ActualA :=
+            DINT_TO_REAL(DWORD_TO_DINT(#CurrentRaw)) * 0.01;
+            
+        END_IF;
+        
+        //--------------------------------------------------
+        // Toggle READ/WRITE
+        //--------------------------------------------------
+        "MB_Modbus".IsWriteCycle := NOT "MB_Modbus".IsWriteCycle;
+        
+        "MB_Modbus".State := 0;
+        
+END_CASE;
