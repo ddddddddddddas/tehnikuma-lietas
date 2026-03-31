@@ -1,0 +1,18 @@
+#crc := WORD#16#FFFF;
+
+#lenInt := UINT_TO_INT(#Length);
+
+FOR #i := 0 TO #lenInt - 1 DO
+    #crc := #crc XOR BYTE_TO_WORD(#Buffer[INT_TO_UINT(#i)]);
+    
+    FOR #j := 0 TO 7 DO
+        IF (#crc AND WORD#16#0001) <> WORD#16#0000 THEN
+            #crc := SHR(IN := #crc, N := 1);
+            #crc := #crc XOR WORD#16#A001;
+        ELSE
+            #crc := SHR(IN := #crc, N := 1);
+        END_IF;
+    END_FOR;
+END_FOR;
+
+#FC_ModbusCRC16 := #crc;
