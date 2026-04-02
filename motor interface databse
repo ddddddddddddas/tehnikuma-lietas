@@ -1,0 +1,8 @@
+"MB_Modbus".CmdFrequencyHz := "DB_Motor1".SetSpeed_Hz;
+"MB_Modbus".RunCmd := "DB_Motor1".Start;
+
+"DB_Motor1".ActualSpeed_Hz := "MB_Modbus".ActualFrequencyHz;
+"DB_Motor1".Current_A := "MB_Modbus".ActualCurrentA;
+"DB_Motor1".Power_kW := "MB_Modbus".EstimatedkW;
+
+"DB_Motor1".Running := "MB_Modbus".RunCmd;
